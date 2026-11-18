@@ -1,3 +1,4 @@
 .DS_Store
 media/
 catalog.preview.json
+__pycache__/

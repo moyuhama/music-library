@@ -15,12 +15,18 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--publish',action='store_true');args=parser.parse_args();rows=[]
     previous=json.loads((ROOT/'catalog.json').read_text()) if (ROOT/'catalog.json').exists() else {'tracks':[]}
     known={t.get('sha256'):t for t in previous['tracks']}
+    by_path={t.get('path'):t for t in previous['tracks']}
+    used=set()
     for file in sorted((ROOT/'music').rglob('*')):
         if not file.is_file() or file.is_symlink() or file.suffix.lower() not in AUDIO:continue
         if file.stat().st_size>=100*1024**2:parser.error(f'{file.name} exceeds GitHub single-file limit')
         info=json.loads(run('ffprobe','-v','quiet','-print_format','json','-show_format',str(file),capture_output=True).stdout).get('format',{})
-        tags=info.get('tags',{});checksum=digest(file);old=known.get(checksum,{});relative=file.relative_to(ROOT).as_posix()
-        row={'id':old.get('id') or 'bundled-'+hashlib.sha256(relative.encode()).hexdigest()[:24],'title':tags.get('title') or file.stem,'artist':tags.get('artist') or old.get('artist') or file.parent.parent.name,'album':tags.get('album') or file.parent.name,'path':relative,'url':raw(file),'sha256':checksum,'bytes':file.stat().st_size,'duration':float(info.get('duration',0)),'hosted':True}
+        tags=info.get('tags',{});checksum=digest(file);relative=file.relative_to(ROOT).as_posix()
+        old=by_path.get(relative) or known.get(checksum,{})
+        identifier=old.get('id')
+        if not identifier or identifier in used:identifier='bundled-'+hashlib.sha256(relative.encode()).hexdigest()[:24]
+        used.add(identifier)
+        row={'id':identifier,'title':tags.get('title') or file.stem,'artist':tags.get('artist') or old.get('artist') or file.parent.parent.name,'album':tags.get('album') or file.parent.name,'path':relative,'url':raw(file),'sha256':checksum,'bytes':file.stat().st_size,'duration':float(info.get('duration',0)),'hosted':True}
         cover=next((file.parent/name for name in ['cover.jpg','cover.png','folder.jpg','cover.webp'] if (file.parent/name).is_file()),None)
         if cover:row['cover']=raw(cover)
         subtitles=[]
