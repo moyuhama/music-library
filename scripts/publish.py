@@ -12,7 +12,7 @@ def digest(file):
 def raw(file):return RAW+urllib.parse.quote(file.relative_to(ROOT).as_posix(),safe='/')
 def run(*args,**kw):return subprocess.run(args,check=True,text=True,**kw)
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--publish',action='store_true');args=parser.parse_args();rows=[]
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--publish',action='store_true');parser.add_argument('--write',action='store_true',help='Write catalog.json without committing (for GitHub Actions)');args=parser.parse_args();rows=[]
     previous=json.loads((ROOT/'catalog.json').read_text()) if (ROOT/'catalog.json').exists() else {'tracks':[]}
     known={t.get('sha256'):t for t in previous['tracks']}
     by_path={t.get('path'):t for t in previous['tracks']}
@@ -38,9 +38,9 @@ def main():
                 else:subtitles.append({'text':text,'format':fmt})
         if subtitles:row['subtitles']=subtitles
         rows.append(row)
-    if not rows:parser.error('No music found; existing index left unchanged')
+    if not rows and not args.write:parser.error('No music found; existing index left unchanged')
     catalog={'version':1,'repository':'https://github.com/moyuhama/music-library','tracks':rows}
-    (ROOT/('catalog.json' if args.publish else 'catalog.preview.json')).write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+'\n')
+    (ROOT/('catalog.json' if args.publish or args.write else 'catalog.preview.json')).write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+'\n')
     print(f'{len(rows)} tracks, {sum(t["bytes"] for t in rows)/1024**2:.1f} MiB',flush=True)
     if args.publish:
         run('git','-C',str(ROOT),'add','music','catalog.json')
