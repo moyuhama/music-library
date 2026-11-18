@@ -18,7 +18,6 @@ def main():
     parser.add_argument('--publish', action='store_true', help='Upload new audio; then atomically publish index by pushing Git')
     args=parser.parse_args(); folder=args.folder.resolve()
     if not folder.is_dir(): parser.error('Audio folder does not exist')
-    old=json.loads((ROOT/'catalog.json').read_text()) if (ROOT/'catalog.json').exists() else {'tracks':[]}
     tracks=[]; uploads={}
     for file in sorted(folder.rglob('*')):
         if not file.is_file() or file.is_symlink() or file.suffix.lower() not in AUDIO: continue
@@ -63,7 +62,8 @@ def main():
         (ROOT/'catalog.json').write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+'\n')
         run('git','-C',str(ROOT),'add','catalog.json','covers')
         changed=subprocess.run(['git','-C',str(ROOT),'diff','--cached','--quiet']).returncode
-        if changed: run('git','-C',str(ROOT),'commit','-m',f'Update music catalog ({len(tracks)} tracks)');run('git','-C',str(ROOT),'push')
+        if changed: run('git','-C',str(ROOT),'commit','-m',f'Update music catalog ({len(tracks)} tracks)')
+        run('git','-c','http.version=HTTP/1.1','-C',str(ROOT),'push')
     else:
         (ROOT/'catalog.preview.json').write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+'\n')
     print(f'{len(tracks)} tracks, {sum(t["bytes"] for t in tracks)/1024**2:.1f} MiB',flush=True)
